@@ -11,7 +11,7 @@ import time
 
 #slitly modifided code for spliting messages from server
 def parsemsg(s):
-    print(s)
+    #print(s)
     """Breaks a message from an IRC server into its sender, prefix, command, and arguments.
     """
     sender = ''
@@ -76,7 +76,7 @@ if len(sys.argv) != 5:
 try:
     hostname = sys.argv[1]
     port = int(sys.argv[2])
-    channel = sys.argv[3]
+    channel = '#' + sys.argv[3]
     secret = sys.argv[4]
 except ValueError:
     print("invalid input: ", sys.argv[2])
@@ -114,8 +114,24 @@ while not shutoff:
         ircinput = ircsocket.recv(1024).decode("utf-8")
 
         #check to see if input is a ping message, if not see if its one of the commands
+        #args[0] is the channel
+        #args[1] is the message
         if not isping(ircinput, ircsocket) and not ircsocket == -1:
             user, prefix, command, args = parsemsg(ircinput)
+            #print('user: ', user)
+            if len(args) < 2:
+                pass
+            elif args[1] == "status\r\n":
+                print("i am here")
+            elif "attack" in args[1]:
+                print("attack is found")
+            elif "move" in args[1]:
+                print("move is found")
+            elif args[1] == "shutdown\r\n":
+                shutoff = True
+                break
+
+            
 
     except OSError:
         print("failed to recive from socket")
