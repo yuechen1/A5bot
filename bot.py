@@ -12,7 +12,7 @@ import random
 
 #slitly modifided code for spliting messages from server
 def parsemsg(s):
-    print(s)
+    #print(s)
     """Breaks a message from an IRC server into its sender, prefix, command, and arguments.
     """
     sender = ''
@@ -21,22 +21,23 @@ def parsemsg(s):
     commandpar = ''
     if not s:
         print("no response from server")
-    if s[0] == ':':
-        prefixpar, s = s[1:].split(' ', 1)
-        if prefixpar.find('!') != -1:
-            sender, prefixpar = prefixpar.split("!", 1)
-        else:
-            sender = None
-    if s.find(' :') != -1:
-        s, trailing = s.split(' :', 1)
-        argspar = s.split()
-        argspar.append(trailing)
     else:
-        argspar = s.split()
-    commandpar = argspar.pop(0)
-    #print("sender:", sender)
-    #print("commandpar:", commandpar)
-    #print("args:", argspar)
+        if s[0] == ':':
+            prefixpar, s = s[1:].split(' ', 1)
+            if prefixpar.find('!') != -1:
+                sender, prefixpar = prefixpar.split("!", 1)
+            else:
+                sender = None
+        if s.find(' :') != -1:
+            s, trailing = s.split(' :', 1)
+            argspar = s.split()
+            argspar.append(trailing)
+        else:
+            argspar = s.split()
+        commandpar = argspar.pop(0)
+        #print("sender:", sender)
+        #print("commandpar:", commandpar)
+        #print("args:", argspar)
     return sender, prefixpar, commandpar, argspar
 
 #ping message
@@ -60,6 +61,7 @@ hostname = ''
 port = 0
 channel = ''
 secret = ''
+username = 'bot'
 
 #function variables
 poweruser = []
@@ -73,6 +75,7 @@ shutoff = False
 isconnected = False
 issocket = False
 isname = False
+issent = False
 
 
 
@@ -113,28 +116,67 @@ while not shutoff:
             time.sleep(5)
     #loop until a user use the secret password
     if not isconnected:
+        print("here again")
         try:
-            time.sleep(1)
+            """ircsocket.send("NICK {}\r\n".format(botname).encode("utf-8"))
+            ircsocket.send("USER {} 0 * :{}\r\n".format(username, username).encode("utf-8"))
+            isconnected = True
+            """
             while not isname:
                 ircsocket.send("NICK {}\r\n".format(botname).encode("utf-8"))
-                ircsocket.send("USER {} 0 * {}\r\n".format(botname, botname).encode("utf-8"))
-                while isname:
+                if not issent:
+                    ircsocket.send("USER {} 0 * :{}\r\n".format(username, username).encode("utf-8"))
+                    issent = True
+                if(not issocket):
+                    break
+                while not isname:
                     ircinput = ircsocket.recv(1024).decode("utf-8")
+                    print(ircinput)
+                    if isping(ircinput, ircsocket):
+                        continue
                     user, prefix, command, args = parsemsg(ircinput)
-                    if command == "NOTICE\r\n":
-                        if "Nickname is already in use" in args[1]:
+                    if "NOTICE" in command:
+                        if "433" in args[1]:
                             print("botname failed:", botname)
                             botname = 'bot' + str(random.randint(0, 1000))
                             break
                         elif "Welcome" in args[1]:
+                            print("got in")
                             isname = True
+                            isconnected = True
                             break
                         time.sleep(1)
-            
+                    elif command == "ERROR":
+                        print("there was an error")
+                        issocket = False
+                        ircsocket.close()
+                        ircsocket = socket.socket()
+                        break
+                    elif "433" in command:
+                        print("botname failed:", botname)
+                        botname = 'bot' + str(random.randint(0, 1000))
+                        break
+                if(not issocket):
+                    break
+            print("got to here")
+            time.sleep(20)
             ircsocket.send("JOIN {}\r\n".format(channel).encode("utf-8"))
             print("JOIN {}\r\n".format(channel))
         except OSError:
             print("failed to connect to channel")
+            while not issocket:
+                try:
+                    ircsocket.connect((socket.gethostbyname(hostname), port))
+                    issocket = True
+                    time.sleep(1)
+                except socket.timeout:
+                    issocket = False
+                    time.sleep(5)
+                except OSError:
+                    print("cannot connect to ircserver")
+                    issocket = False
+                    time.sleep(5)
+
     try:
         ircinput = ircsocket.recv(1024).decode("utf-8")
 
