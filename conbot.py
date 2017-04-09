@@ -194,7 +194,7 @@ while not isquit:
                 isshutdown = False
             iscommand = False
             print("input command:")
-        r, w, x = select.select([ircsocket, sys.stdin], [], [])
+        r, w, x = select.select([ircsocket, sys.stdin], [], [], 1)
         if ircsocket in r:
             ircinput = ircsocket.recv(1024).decode("utf-8")
             if not isping(ircinput, ircsocket):
