@@ -136,20 +136,23 @@ while not isquit:
                 if not issent:
                     ircsocket.send("USER {} 0 * :{}\r\n".format(username, username).encode("utf-8"))
                     issent = True
-                if(not issocket):
-                    break
                 while not isname:
                     ircinput = ircsocket.recv(1024).decode("utf-8")
                     #print(ircinput)
                     if isping(ircinput, ircsocket):
                         continue
                     user, prefix, command, args = parsemsg(ircinput)
-                    if "NOTICE" in command:
-                        if "Welcome" in args[1]:
-                            print("Connected to irc")
-                            isname = True
-                            isconnected = True
-                            break
+                    print(command)
+                    if "Welcome" in args[1]:
+                        print("Connected to irc")
+                        isname = True
+                        isconnected = True
+                        break
+                    elif "001" in command:
+                        print("Connected to irc")
+                        isname = True
+                        isconnected = True
+                        break
                     elif command == "ERROR":
                         print("there was an error:", args)
                         issocket = False

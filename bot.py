@@ -130,20 +130,22 @@ while not shutoff:
                 if not issent:
                     ircsocket.send("USER {} 0 * :{}\r\n".format(username, username).encode("utf-8"))
                     issent = True
-                if(not issocket):
-                    break
                 while not isname:
                     ircinput = ircsocket.recv(1024).decode("utf-8")
                     print(ircinput)
                     if isping(ircinput, ircsocket):
                         continue
                     user, prefix, command, args = parsemsg(ircinput)
-                    if "NOTICE" in command:
-                           if "Welcome" in args[1]:
-                            print("got in")
-                            isname = True
-                            isconnected = True
-                            break
+                    if "Welcome" in args[1]:
+                        print("got in")
+                        isname = True
+                        isconnected = True
+                        break
+                    elif "001" in command:
+                        print("Connection made")
+                        isname = True
+                        isconnected = True
+                        break
                     elif command == "ERROR":
                         print("there was an error")
                         issocket = False
@@ -157,8 +159,8 @@ while not shutoff:
                 if(not issocket):
                     break
                 else:
-                    print("got to here")
-                    time.sleep(10)
+                    print("Waiting to join channel")
+                    time.sleep(5)
                     ircsocket.send("JOIN {}\r\n".format(channel).encode("utf-8"))
                     print("JOIN {}\r\n".format(channel))
         except OSError:
@@ -190,7 +192,7 @@ while not shutoff:
             #send a status message to all the super users
             elif args[1] == "status\r\n" and user in poweruser:
                 try:
-                    ircsocket.send("PRIVMSG {} :I am a bot\r\n".format(user, botname).encode("utf-8"))
+                    ircsocket.send("PRIVMSG {} :I am a bot\r\n".format(user).encode("utf-8"))
                     print("PRIVMSG {} :I am a bot\r\n".format(user).encode("utf-8"))
                 except OSError:
                     print("failed to identify self")
