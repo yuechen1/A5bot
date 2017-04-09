@@ -229,13 +229,8 @@ while not shutoff:
                     ircsocket = socket.socket()
                     nouse, hostname, port, channel = args[1].split(' ')
                     channel = '#' + channel
+                    port = int(port)
                     issocket = False
-                    isname = False
-                    while not issocket:
-                        ircsocket.connect((socket.gethostbyname(hostname), int(port)))
-                        issocket = True
-                        print("new connection is made")
-                        time.sleep(3)
                 except socket.timeout:
                     issocket = False
                     time.sleep(5)
