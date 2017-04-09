@@ -1,0 +1,20 @@
+Name:		Yue Chen
+UCID:		10065082
+Tut: 		T03
+Partner:	Yin-Li (Emily) Chow (10103742, T01)
+
+How to run:
+- conbot
+    - python3 conbot.py <hostname> <port> <channel> <secret>
+    - channel cannot have '#' in it. That part is handled by the code
+- bot
+    - python3 bot.py <hostname> <port> <channel> <secret>
+    - channel cannot have '#' in it. That part is handled by the code
+
+
+conbot will send the secret as the first message after it joins a channel. 
+anything the user type in to conbot will be sent. After a command is used
+no command will be sent for 5 secs
+
+***both conbot and bot will wait a few sec after joinning an irc server to
+joinning a channel.

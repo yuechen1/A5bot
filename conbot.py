@@ -246,6 +246,8 @@ while not isquit:
                 tnow = time.time() + 5
                 numsuccess = 0
                 numunsuccess = 0
+            else:
+                print("input command:")
 
     except socket.timeout:
         continue
